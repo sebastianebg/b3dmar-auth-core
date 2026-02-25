@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from jose import JWTError, jwt
+import jwt as pyjwt
+from jwt.exceptions import ExpiredSignatureError, PyJWTError
 
 ALGORITHM = "HS256"
 
@@ -87,7 +88,7 @@ def create_access_token(
     if extra_claims:
         payload.update(extra_claims)
 
-    return jwt.encode(payload, config.secret_key, algorithm=config.algorithm)
+    return pyjwt.encode(payload, config.secret_key, algorithm=config.algorithm)
 
 
 def create_refresh_token(
@@ -124,7 +125,7 @@ def create_refresh_token(
     if extra_claims:
         payload.update(extra_claims)
 
-    return jwt.encode(payload, config.secret_key, algorithm=config.algorithm)
+    return pyjwt.encode(payload, config.secret_key, algorithm=config.algorithm)
 
 
 def decode_token(
@@ -155,11 +156,10 @@ def decode_token(
         kwargs["issuer"] = config.issuer
 
     try:
-        payload = jwt.decode(token, config.secret_key, **kwargs, options=decode_options)
-    except JWTError as e:
-        err_msg = str(e).lower()
-        if "expired" in err_msg:
-            raise TokenExpiredError("Token has expired") from e
+        payload = pyjwt.decode(token, config.secret_key, **kwargs, options=decode_options)
+    except ExpiredSignatureError as e:
+        raise TokenExpiredError("Token has expired") from e
+    except PyJWTError as e:
         raise InvalidTokenError(f"Invalid token: {e}") from e
 
     sub = payload.get("sub")
